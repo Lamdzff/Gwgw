@@ -1,0 +1,192 @@
+-- // Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local lp = Players.LocalPlayer
+
+-- // Load Fluent UI
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/main/source.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "🔥 Auto Hub",
+    SubTitle = "by GPT",
+    TabWidth = 120,
+    Size = UDim2.fromOffset(420, 300),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "rbxassetid://7734053495" })
+}
+
+-- ==========================
+-- Hitbox Kiếm
+-- ==========================
+local hitboxEnabled = false
+local hitboxSize = Vector3.new(50,50,50)
+
+local function setHitbox()
+    local char = lp.Character
+    if not char then return end
+    for _, v in pairs(char:GetChildren()) do
+        if v:IsA("Tool") and v:FindFirstChild("Handle") then
+            v.Handle.Size = hitboxSize
+            v.Handle.Massless = true
+            v.Handle.Transparency = 1
+            v.Handle.CanCollide = false
+            if not v.Handle:FindFirstChildOfClass("SelectionBox") then
+                local sb = Instance.new("SelectionBox", v.Handle)
+                sb.Adornee = v.Handle
+                sb.Color3 = Color3.new(0,0.3,0.47)
+            end
+        end
+    end
+end
+
+Tabs.Main:AddToggle("Hitbox", {
+    Title = "Hitbox Kiếm (Boss + Người)",
+    Default = false,
+    Callback = function(Value)
+        hitboxEnabled = Value
+        if hitboxEnabled then
+            setHitbox()
+            Fluent:Notify({
+                Title = "Hitbox",
+                Content = "Đã mở rộng hitbox vũ khí!",
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Hitbox",
+                Content = "Đã tắt hitbox, reset nhân vật để về mặc định.",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- ==========================
+-- Auto Attack
+-- ==========================
+local autoAttackEnabled = false
+
+Tabs.Main:AddToggle("AutoAttack", {
+    Title = "Auto Attack",
+    Default = false,
+    Callback = function(Value)
+        autoAttackEnabled = Value
+    end
+})
+
+RunService.Heartbeat:Connect(function()
+    if autoAttackEnabled then
+        local char = lp.Character
+        if char then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then
+                pcall(function()
+                    tool:Activate()
+                end)
+            end
+        end
+    end
+end)
+
+-- ==========================
+-- Auto Grab
+-- ==========================
+local autoGrabEnabled = false
+local pickupPos = Vector3.new(101.5, 19.6, -592.2) -- lấy hàng
+local deliverPos = Vector3.new(-69.4, 19.0, -39.1) -- giao hàng
+
+local function tpTo(pos)
+    if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        lp.Character.HumanoidRootPart.CFrame = CFrame.new(pos + Vector3.new(0,3,0))
+    end
+end
+
+local function firePrompt(prompt)
+    pcall(function()
+        fireproximityprompt(prompt, math.huge)
+    end)
+end
+
+local function findPrompt(keyword)
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt") then
+            local objText = (v.ObjectText or ""):lower()
+            local actText = (v.ActionText or ""):lower()
+            if string.find(objText, keyword) or string.find(actText, keyword) then
+                return v
+            end
+        end
+    end
+    return nil
+end
+
+local function autoGrabLoop()
+    while autoGrabEnabled and task.wait(0.5) do
+        tpTo(pickupPos)
+        task.wait(0.7)
+        local pickPrompt = findPrompt("lấy")
+        if pickPrompt then firePrompt(pickPrompt) end
+        task.wait(4)
+
+        tpTo(deliverPos)
+        task.wait(0.7)
+        local deliverPrompt = findPrompt("giao")
+        if deliverPrompt then firePrompt(deliverPrompt) end
+        task.wait(1.5)
+    end
+end
+
+Tabs.Main:AddToggle("AutoGrab", {
+    Title = "Auto Grab",
+    Default = false,
+    Callback = function(Value)
+        autoGrabEnabled = Value
+        if autoGrabEnabled then
+            task.spawn(autoGrabLoop)
+        end
+    end
+})
+
+-- ==========================
+-- Tele Boss
+-- ==========================
+local function getBoss()
+    for _, npc in pairs(workspace:GetChildren()) do
+        if npc.Name == "Boss Game" and npc:FindFirstChild("HumanoidRootPart") then
+            return npc
+        end
+    end
+    return nil
+end
+
+local function tpToBoss()
+    local boss = getBoss()
+    if boss and lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        lp.Character.HumanoidRootPart.CFrame = boss.HumanoidRootPart.CFrame * CFrame.new(0, -8, 0)
+        Fluent:Notify({
+            Title = "Teleport Boss",
+            Content = "Đã dịch chuyển tới Boss!",
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Teleport Boss",
+            Content = "Không tìm thấy Boss!",
+            Duration = 3
+        })
+    end
+end
+
+Tabs.Main:AddButton({
+    Title = "Teleport To Boss",
+    Description = "Dịch chuyển xuống dưới Boss (xuyên đất)",
+    Callback = tpToBoss
+})
+
+-- // Khởi động
+Window:SelectTab(1)
